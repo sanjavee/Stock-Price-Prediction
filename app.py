@@ -11,11 +11,31 @@ import streamlit as st
 model_cache = {}
 
 def fetch_data(symbol):
+    """Fetches historical closing price data for a given stock symbol over the past 5 years.
+    
+    Retrieves the 'Close' price column from Yahoo Finance for the specified symbol.
+
+    Args:
+        symbol (str): The stock ticker symbol to fetch data for.
+
+    Returns:
+        pandas.DataFrame: A DataFrame containing the 'Close' prices for the stock.
+    """
     stock = yf.Ticker(symbol)
     data = stock.history(period="5y")
     return data[['Close']]
 
 def preprocess_data(df):
+    """Adds technical indicators and features to a stock price DataFrame.
+
+    Computes various technical indicators such as moving averages, returns, RSI, Bollinger Bands, momentum, and volatility.
+
+    Args:
+        df (pandas.DataFrame): DataFrame containing at least a 'Close' price column.
+
+    Returns:
+        pandas.DataFrame: The input DataFrame with additional columns for technical indicators.
+    """
     df['SMA_50'] = df['Close'].rolling(window=50).mean()
     df['EMA_50'] = df['Close'].ewm(span=20, adjust=False).mean()
     df['Daily_Return'] = df['Close'].pct_change()
@@ -36,11 +56,34 @@ def preprocess_data(df):
     return df
 
 def normalize_data(df):
+    """
+    Normalizes the 'Close' column of a DataFrame using MinMax scaling.
+
+    Args:
+        df (pandas.DataFrame): Input DataFrame containing a 'Close' column.
+
+    Returns:
+        tuple: A tuple containing:
+            - scaled_data (numpy.ndarray): The normalized 'Close' column values.
+            - scaler (MinMaxScaler): The fitted MinMaxScaler object.
+    """
     scaler = MinMaxScaler()
     scaled_data = scaler.fit_transform(df[['Close']])
     return scaled_data, scaler
 
 def prepare_data(scaled_data, time_steps=60):
+    """
+    Prepares input and output sequences for time series prediction models.
+
+    Args:
+        scaled_data (np.ndarray): The scaled time series data, typically a 2D numpy array.
+        time_steps (int, optional): The number of previous time steps to use for each input sequence. Defaults to 60.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: A tuple containing:
+            - X: 3D numpy array of input sequences with shape (samples, time_steps, features).
+            - y: 1D numpy array of target values corresponding to each input sequence.
+    """
     X, y = [], []
     for i in range(time_steps, len(scaled_data)):
         X.append(scaled_data[i - time_steps:i])
@@ -48,6 +91,15 @@ def prepare_data(scaled_data, time_steps=60):
     return np.array(X), np.array(y)
 
 def build_model(input_shape):
+    """
+    Builds and compiles a Sequential LSTM-based neural network model for time series prediction.
+
+    Args:
+        input_shape (tuple): Shape of the input data (timesteps, features).
+
+    Returns:
+        keras.models.Sequential: Compiled Keras Sequential model with two LSTM layers and two Dense layers.
+    """
     model = Sequential([
         LSTM(50, return_sequences=True, input_shape=input_shape),
         LSTM(50, return_sequences=False),
